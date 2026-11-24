@@ -332,8 +332,10 @@ fn tabs(ui: &mut Ui, app: &GitApp, left: f32, acts: &mut Vec<Action>) -> f32 {
         se: 0,
     };
     let mut x = left;
-    // (rect, highlighted) of each tab, to place the separators afterwards.
+    // (rect, highlighted) of each tab, to place the separators and the drop marker afterwards.
     let mut drawn: Vec<(Rect, bool)> = Vec::new();
+    // The tab being dragged to a new place: (its id, whether it was just dropped).
+    let mut dragging: Option<(u64, bool)> = None;
     for i in app.visible_tabs() {
         let t = &app.tabs[i];
         let active = app.active == Some(i);
@@ -346,9 +348,13 @@ fn tabs(ui: &mut Ui, app: &GitApp, left: f32, acts: &mut Vec<Action>) -> f32 {
         let w = (tw + 58.0).clamp(110.0, 220.0);
         let rect = Rect::from_min_size(pos2(x, top), vec2(w, TAB_H));
         x += w + 2.0;
-        let resp = ui.interact(rect, ui.id().with(("tab", t.id)), Sense::click());
+        // Click to show the tab, drag it to reorder the tabs.
+        let resp = ui.interact(rect, ui.id().with(("tab", t.id)), Sense::click_and_drag());
         let hovered = resp.hovered();
         drawn.push((rect, active || hovered));
+        if resp.dragged() || resp.drag_stopped() {
+            dragging = Some((t.id, resp.drag_stopped()));
+        }
 
         // Background: the active tab has the toolbar's color and a thin outline on the top
         // and sides (the bottom edge is clipped away so it flows into the toolbar). A hovered
@@ -418,6 +424,10 @@ fn tabs(ui: &mut Ui, app: &GitApp, left: f32, acts: &mut Vec<Action>) -> f32 {
         } else if resp.clicked() {
             acts.push(Action::ActivateTab(Some(i)));
         }
+        if resp.dragged() {
+            // The dragged tab fades while it is moved.
+            p.rect_filled(rect, round_top, alpha(BG0, 0.55));
+        }
         resp.context_menu(|ui| tab_menu(ui, app, i, acts));
         resp.on_hover_text(t.path.display().to_string());
     }
@@ -430,6 +440,29 @@ fn tabs(ui: &mut Ui, app: &GitApp, left: f32, acts: &mut Vec<Action>) -> f32 {
                 [pos2(sx, a.center().y - 7.0), pos2(sx, a.center().y + 7.0)],
                 Stroke::new(1.0, BORDER),
             );
+        }
+    }
+    // Drag and drop: a bar shows where the tab will land; dropping it moves it there.
+    if let Some((tab, dropped)) = dragging {
+        if let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) {
+            // Slot = how many tabs are left of the pointer (0 = first place).
+            let to = drawn
+                .iter()
+                .filter(|(r, _)| r.center().x < pointer.x)
+                .count();
+            if dropped {
+                acts.push(Action::ReorderTab { tab, to });
+            } else {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+                let x = match to {
+                    0 => drawn[0].0.left() - 1.0,
+                    n => drawn[n - 1].0.right() + 1.0,
+                };
+                p.line_segment(
+                    [pos2(x, top + 4.0), pos2(x, full.bottom() - 4.0)],
+                    Stroke::new(2.0, CYAN),
+                );
+            }
         }
     }
     drawn.last().map(|(r, _)| r.right()).unwrap_or(left)

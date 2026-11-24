@@ -38,6 +38,11 @@ pub enum Action {
         tab: u64,
         workspace: u64,
     },
+    /// Move the tab with this id so it becomes the `to`-th tab of its workspace (drag and drop).
+    ReorderTab {
+        tab: u64,
+        to: usize,
+    },
     ForgetRecent(PathBuf),
     Refresh,
     LoadMore,
@@ -155,6 +160,7 @@ impl GitApp {
             Action::NewWorkspace { name, with_tab } => self.new_workspace(&name, with_tab),
             Action::RenameWorkspace { id, name } => self.rename_workspace(id, &name),
             Action::DeleteWorkspace(id) => self.delete_workspace(id),
+            Action::ReorderTab { tab, to } => self.reorder_tab(tab, to),
             Action::MoveTab { tab, workspace } => {
                 self.move_tab(tab, workspace);
                 let name = self
