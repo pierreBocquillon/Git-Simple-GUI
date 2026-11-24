@@ -116,7 +116,7 @@ Right-click on anything — a branch, a commit, a tag — to see everything you 
 - Every project opens in a **tab**.
 - Group tabs into **workspaces** — for example *Work* and *Personal* — and only see the current
   one's tabs. Switch with the menu at the top left or with <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd>.
-- Right-click a tab to move it to another workspace.
+- Drag and drop tabs to reorder them; right-click a tab to move it to another workspace.
 - Projects refresh by themselves when they change on disk.
 
 ## Keyboard shortcuts

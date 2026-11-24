@@ -125,4 +125,61 @@ impl GitApp {
         }
         self.save_state();
     }
+
+    /// Move a tab of the current workspace to slot `to` (0 = first; the number of tabs = last),
+    /// as when it is dragged and dropped in the tab bar. Other workspaces are not affected.
+    pub(super) fn reorder_tab(&mut self, tab: u64, to: usize) {
+        let visible = self.visible_tabs();
+        let Some(from) = visible.iter().position(|&i| self.tabs[i].id == tab) else {
+            return;
+        };
+        // Dropped on its own place (just before or just after itself): nothing to do.
+        if to == from || to == from + 1 {
+            return;
+        }
+        let active_id = self.active.map(|a| self.tabs[a].id);
+        move_in_subset(&mut self.tabs, &visible, from, to);
+        // `active` is a position in `self.tabs`, which just changed.
+        self.active = active_id.and_then(|id| self.tabs.iter().position(|t| t.id == id));
+        self.save_state();
+    }
+}
+
+/// Move one item of a subset of `items` (the positions `subset`, in order) so it becomes the
+/// `to`-th item of that subset. Items outside the subset keep their relative order.
+fn move_in_subset<T>(items: &mut Vec<T>, subset: &[usize], from: usize, to: usize) {
+    let moved = items.remove(subset[from]);
+    // Positions of the other subset items, now that one item is gone.
+    let rest: Vec<usize> = subset
+        .iter()
+        .filter(|&&i| i != subset[from])
+        .map(|&i| if i > subset[from] { i - 1 } else { i })
+        .collect();
+    let slot = if to > from { to - 1 } else { to };
+    let at = match rest.get(slot) {
+        Some(&i) => i,
+        None => rest.last().map_or(items.len(), |&i| i + 1),
+    };
+    items.insert(at, moved);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::move_in_subset;
+
+    #[test]
+    fn moves_within_the_subset_only() {
+        // a1 b1 a2 a3 b2: workspace "a" is at positions 0, 2, 3.
+        let mut items = vec!["a1", "b1", "a2", "a3", "b2"];
+        move_in_subset(&mut items, &[0, 2, 3], 0, 3); // a1 to the end of "a"
+        assert_eq!(items, ["b1", "a2", "a3", "a1", "b2"]);
+
+        let mut items = vec!["a1", "b1", "a2", "a3", "b2"];
+        move_in_subset(&mut items, &[0, 2, 3], 2, 0); // a3 to the front of "a"
+        assert_eq!(items, ["a3", "a1", "b1", "a2", "b2"]);
+
+        let mut items = vec!["a1", "a2", "a3"];
+        move_in_subset(&mut items, &[0, 1, 2], 0, 2); // a1 between a2 and a3
+        assert_eq!(items, ["a2", "a1", "a3"]);
+    }
 }
