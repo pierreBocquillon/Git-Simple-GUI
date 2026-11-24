@@ -30,6 +30,20 @@ pub enum Post {
         item: Undoable,
         was_undo: bool,
     },
+    /// A commit message was changed (`Task::Reword`): `reference` (a branch or HEAD) was at
+    /// `old_head` before. The job's output is the commit's new ID.
+    Reword {
+        reference: String,
+        old_head: String,
+        pushed: bool,
+    },
+}
+
+/// Work that is more than a list of git commands, run in the background before the steps.
+#[derive(Clone, Debug)]
+pub enum Task {
+    /// Give an existing commit of the current branch a new message (see `git::reword`).
+    Reword { hash: String, message: String },
 }
 
 #[derive(Clone, Debug)]
@@ -43,6 +57,8 @@ pub struct Job {
     pub sync: bool,
     /// No toast when it succeeds.
     pub quiet: bool,
+    /// Runs before `steps`; when it fails, the steps are not run.
+    pub task: Option<Box<Task>>,
 }
 
 impl Job {
@@ -55,7 +71,12 @@ impl Job {
             post: Post::None,
             sync: false,
             quiet: false,
+            task: None,
         }
+    }
+    pub fn task(mut self, task: Task) -> Job {
+        self.task = Some(Box::new(task));
+        self
     }
     pub fn quick(mut self) -> Job {
         self.sync = true;
@@ -160,6 +181,35 @@ impl GitApp {
                 Post::Open(path) => {
                     self.open_repo(&path, true);
                 }
+                Post::Reword {
+                    reference,
+                    old_head,
+                    pushed,
+                } => {
+                    if let Some(i) = tab_idx {
+                        let t = &mut self.tabs[i];
+                        let new_head = git::git(&t.path, &["rev-parse", "HEAD"])
+                            .stdout
+                            .trim()
+                            .to_string();
+                        t.undo.push(Undoable {
+                            label: tr!("job.reword_undo").to_string(),
+                            undo: vec![args(&["update-ref", &reference, &old_head])],
+                            redo: vec![args(&["update-ref", &reference, &new_head])],
+                        });
+                        t.redo.clear();
+                        let new = output.stdout.trim().to_string();
+                        if !new.is_empty() {
+                            t.selection = Selection::Commit(new);
+                        }
+                    }
+                    let text = if pushed {
+                        tr!("job.reword_done_pushed")
+                    } else {
+                        tr!("job.reword_done_text")
+                    };
+                    self.toast(true, tr!("job.reword_done"), text);
+                }
                 Post::Push { .. } | Post::None => {}
             }
             if !job.quiet {
@@ -230,6 +280,19 @@ fn run_steps(job: &Job) -> GitOutput {
         stdout: String::new(),
         stderr: String::new(),
     };
+    match (job.task.as_deref(), &job.cwd) {
+        (Some(Task::Reword { hash, message }), Some(cwd)) => {
+            match git::reword(cwd, hash, message) {
+                Ok(new) => out.stdout = new,
+                Err(e) => {
+                    out.ok = false;
+                    out.stderr = e;
+                    return out;
+                }
+            }
+        }
+        (Some(_), None) | (None, _) => {}
+    }
     for step in &job.steps {
         let o = git::run_in(job.cwd.as_deref(), step);
         out.stdout += &o.stdout;

@@ -76,6 +76,27 @@ pub fn run_in(repo: Option<&Path>, args: &[String]) -> GitOutput {
     }
 }
 
+/// Run git on raw bytes: `input` is written to its standard input, and its standard output is
+/// returned untouched (commit objects may hold text that is not UTF-8). `Err` holds git's error.
+pub fn git_bytes(repo: &Path, args: &[&str], input: Option<&[u8]>) -> Result<Vec<u8>, String> {
+    use std::io::Write;
+    let mut cmd = base_command(Some(repo));
+    cmd.args(args);
+    if input.is_some() {
+        cmd.stdin(Stdio::piped());
+    }
+    let mut child = cmd.spawn().map_err(|e| tr!("git.cannot_run", error = e))?;
+    if let (Some(data), Some(mut stdin)) = (input, child.stdin.take()) {
+        stdin.write_all(data).map_err(|e| e.to_string())?;
+    }
+    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
 pub fn git(repo: &Path, args: &[&str]) -> GitOutput {
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     run_in(Some(repo), &args)

@@ -95,6 +95,8 @@ Right-click on anything — a branch, a commit, a tag — to see everything you 
 - Pick which files go into a commit, or take them all.
 - Undo the changes to a file you don't want to keep.
 - Fix the last commit (forgot a file, typo in the message).
+- Change the message of any commit of your branch, even an old one: right-click it →
+  **Edit commit message…** (your files are not touched).
 - Pull and push with one click; the buttons show how many commits are waiting.
 
 ### Work with branches

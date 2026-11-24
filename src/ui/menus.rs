@@ -405,6 +405,12 @@ pub fn commit_menu(ui: &mut Ui, tab: &RepoTab, hash: &str, acts: &mut Vec<Action
         sep(ui);
     }
 
+    if d.state == crate::git::RepoState::Clean
+        && tab.is_head_ancestor(hash)
+        && item(ui, Some(Icon::Commit), tr!("menu.commit.edit_message"))
+    {
+        acts.push(Action::EditCommit(hash.to_string()));
+    }
     if !is_head && item(ui, Some(Icon::Check), tr!("menu.commit.checkout")) {
         acts.push(Action::Run(commands::checkout_job(
             tab,

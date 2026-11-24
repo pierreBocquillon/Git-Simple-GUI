@@ -53,6 +53,8 @@ pub enum Action {
         force: bool,
     },
     Commit,
+    /// Open the dialog to change the message of this commit (of the current branch).
+    EditCommit(String),
     StashQuick,
     ShowInExplorer(PathBuf),
     /// Open a web page in the browser.
@@ -225,6 +227,7 @@ impl GitApp {
             }
             Action::Push { force } => self.push(force, ctx),
             Action::Commit => self.commit(ctx),
+            Action::EditCommit(hash) => self.edit_commit(&hash),
             Action::StashQuick => {
                 let Some(t) = self.tab() else { return };
                 let label = tr!("action.stash_message", branch = t.head_label());
@@ -372,6 +375,36 @@ impl GitApp {
             target,
         });
         self.run_job(job, ctx);
+    }
+
+    /// Open the "edit commit message" dialog, filled with the commit's current message.
+    fn edit_commit(&mut self, hash: &str) {
+        let Some(t) = self.tab() else { return };
+        let Some(d) = &t.data else { return };
+        if d.state != RepoState::Clean {
+            self.toast(
+                false,
+                tr!("action.edit_commit_busy"),
+                tr!("action.edit_commit_busy_text"),
+            );
+            return;
+        }
+        let message = git::git(&t.path, &["log", "-1", "--format=%B", hash]).stdout;
+        let (summary, body) = match message.trim().split_once('\n') {
+            Some((s, b)) => (s.trim().to_string(), b.trim().to_string()),
+            None => (message.trim().to_string(), String::new()),
+        };
+        let pushed = !git::git(&t.path, &["branch", "-r", "--contains", hash])
+            .stdout
+            .trim()
+            .is_empty();
+        self.dialog = Some(Dialog::EditCommit {
+            tab: t.id,
+            hash: hash.to_string(),
+            summary,
+            body,
+            pushed,
+        });
     }
 
     fn commit(&mut self, ctx: &Context) {

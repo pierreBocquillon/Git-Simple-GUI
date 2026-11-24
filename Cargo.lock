@@ -1284,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "git-simple-gui"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "eframe",
  "image",
