@@ -1,0 +1,28 @@
+# Build output (cargo) and release files (portable zip, installer)
+/target
+/dist
+**/*.rs.bk
+*.pdb
+
+# Files the app writes next to itself when installed or run locally
+language.ini
+
+# Secrets and local environment (never commit tokens)
+.env
+.env.*
+*.pem
+*.key
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Windows / macOS system files
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
