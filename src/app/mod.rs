@@ -20,7 +20,7 @@ mod workspace;
 
 pub use actions::Action;
 pub use dialog::Dialog;
-pub use jobs::{args, Job, JobResult, Post, Undoable};
+pub use jobs::{args, Job, JobResult, Post, Task, Undoable};
 pub use repo_tab::{RepoTab, Selection, PAGE_COMMITS};
 pub use settings::PullMode;
 pub use updates::Updates;

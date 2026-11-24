@@ -2,7 +2,7 @@
 //! workspaces and confirmations. Most dialogs turn what was typed into a git `Job`; the
 //! workspace ones produce an `Action` instead.
 
-use crate::app::{args, Action, Dialog, GitApp, Job, Post, RepoTab, Undoable};
+use crate::app::{args, Action, Dialog, GitApp, Job, Post, RepoTab, Task, Undoable};
 use crate::git;
 use crate::ui::icons::{self, Icon};
 use crate::ui::paint::{self};
@@ -70,6 +70,7 @@ pub fn global_job(label: &str, steps: Vec<Vec<String>>, post: Post, sync: bool) 
         post,
         sync,
         quiet: false,
+        task: None,
     }
 }
 
@@ -83,7 +84,7 @@ pub fn show(app: &mut GitApp, ctx: &Context, acts: &mut Vec<Action>) {
     let mut close = false;
     let mut submit: Option<Job> = None;
     let mut submit_action: Option<Action> = None;
-    let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift);
+    let mut enter = ctx.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift);
 
     let (title, icon, accent) = match dialog {
         Dialog::NewBranch { .. } => (tr!("dialog.new_branch.title"), Icon::Branch, CYAN),
@@ -100,6 +101,7 @@ pub fn show(app: &mut GitApp, ctx: &Context, acts: &mut Vec<Action>) {
             (tr!("dialog.delete_workspace.title"), Icon::Warning, REMOVED)
         }
         Dialog::Identity { .. } => (tr!("dialog.identity.title"), Icon::Gear, VIOLET),
+        Dialog::EditCommit { .. } => (tr!("dialog.edit_commit.title"), Icon::Commit, VIOLET),
         Dialog::GitHub { .. } => (tr!("dialog.github.title"), Icon::Cloud, CYAN),
         Dialog::Update => (tr!("dialog.update.title"), Icon::Pull, CYAN),
         Dialog::Confirm { danger, .. } => {
@@ -617,6 +619,84 @@ pub fn show(app: &mut GitApp, ctx: &Context, acts: &mut Vec<Action>) {
                             Post::None,
                             true,
                         ));
+                    }
+                }
+                Dialog::EditCommit {
+                    tab,
+                    hash,
+                    summary,
+                    body,
+                    pushed,
+                } => {
+                    ui.label(
+                        RichText::new(tr!(
+                            "dialog.edit_commit.on_commit",
+                            hash = &hash[..7.min(hash.len())]
+                        ))
+                        .color(TEXT_FAINT),
+                    );
+                    ui.add_space(6.0);
+                    field(
+                        ui,
+                        tr!("wip.commit_message"),
+                        summary,
+                        tr!("wip.summary_hint"),
+                        true,
+                    );
+                    let description = ui.add(
+                        TextEdit::multiline(body)
+                            .hint_text(tr!("wip.description_hint"))
+                            .desired_width(f32::INFINITY)
+                            .desired_rows(5)
+                            .margin(Margin::symmetric(10, 8)),
+                    );
+                    // Enter makes a new line in the description, it does not save.
+                    if description.has_focus() {
+                        enter = false;
+                    }
+                    ui.add_space(4.0);
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(tr!("dialog.edit_commit.note")).color(TEXT_FAINT),
+                        )
+                        .wrap(),
+                    );
+                    if *pushed {
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(tr!("dialog.edit_commit.pushed")).color(MODIFIED),
+                            )
+                            .wrap(),
+                        );
+                    }
+                    ok_label = tr!("dialog.save").into();
+                    ok_enabled = !summary.trim().is_empty();
+                    if ok_enabled {
+                        let short = &hash[..7.min(hash.len())];
+                        submit = tabs.iter().find(|t| t.id == *tab).and_then(|t| {
+                            let d = t.data.as_ref()?;
+                            let old_head = d.head_hash.clone()?;
+                            let reference = match &d.head_branch {
+                                Some(b) => format!("refs/heads/{b}"),
+                                None => "HEAD".to_string(),
+                            };
+                            let mut job = Job::new(
+                                t,
+                                tr!("dialog.edit_commit.job", hash = short),
+                                Vec::new(),
+                            )
+                            .task(Task::Reword {
+                                hash: hash.clone(),
+                                message: git::join_message(summary, body),
+                            })
+                            .post(Post::Reword {
+                                reference,
+                                old_head,
+                                pushed: *pushed,
+                            });
+                            job.quiet = true;
+                            Some(job)
+                        });
                     }
                 }
                 Dialog::Confirm {

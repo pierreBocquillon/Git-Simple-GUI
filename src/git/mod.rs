@@ -5,15 +5,18 @@
 //! - `repository` reads a repository into those types
 //! - `diff`       file diffs and their parser
 //! - `names`      initials and branch-name helpers
+//! - `reword`     change the message of an existing commit
 
 mod command;
 mod diff;
 mod model;
 mod names;
 mod repository;
+mod reword;
 
 pub use command::*;
 pub use diff::*;
 pub use model::*;
 pub use names::*;
 pub use repository::*;
+pub use reword::*;

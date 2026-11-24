@@ -69,6 +69,15 @@ pub enum Dialog {
         name: String,
         email: String,
     },
+    /// Change the message of a commit of the current branch.
+    EditCommit {
+        tab: u64,
+        hash: String,
+        summary: String,
+        body: String,
+        /// Already on a remote branch: pushing it again will need a force push.
+        pushed: bool,
+    },
     Confirm {
         title: String,
         text: String,

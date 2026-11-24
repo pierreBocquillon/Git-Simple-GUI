@@ -262,6 +262,35 @@ impl RepoTab {
             .position(|c| c.hash == hash)
     }
 
+    /// Whether `hash` is HEAD or one of its ancestors among the loaded commits: a commit of
+    /// the current branch, whose message can be changed.
+    pub fn is_head_ancestor(&self, hash: &str) -> bool {
+        let Some(d) = self.data.as_ref() else {
+            return false;
+        };
+        let Some(head) = d.head_hash.as_deref() else {
+            return false;
+        };
+        let by_hash: std::collections::HashMap<&str, &[String]> = d
+            .commits
+            .iter()
+            .map(|c| (c.hash.as_str(), c.parents.as_slice()))
+            .collect();
+        let mut seen = std::collections::HashSet::new();
+        let mut todo = vec![head];
+        while let Some(h) = todo.pop() {
+            if h == hash {
+                return true;
+            }
+            if seen.insert(h) {
+                if let Some(parents) = by_hash.get(h) {
+                    todo.extend(parents.iter().map(String::as_str));
+                }
+            }
+        }
+        false
+    }
+
     pub fn has_wip_row(&self) -> bool {
         self.data
             .as_ref()

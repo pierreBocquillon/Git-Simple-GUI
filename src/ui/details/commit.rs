@@ -44,6 +44,22 @@ pub fn show(ui: &mut Ui, tab: &mut RepoTab, avatars: &Avatars, acts: &mut Vec<Ac
                         if sha.on_hover_text(tr!("commit.copy_sha")).clicked() {
                             acts.push(Action::Copy(c.hash.clone()));
                         }
+                        if tab.is_head_ancestor(&c.hash) {
+                            let edit = ui.add(
+                                egui::Button::new(
+                                    RichText::new(tr!("commit.edit_message"))
+                                        .font(theme::regular(12.0))
+                                        .color(TEXT_DIM),
+                                )
+                                .fill(BG3),
+                            );
+                            if edit
+                                .on_hover_text(tr!("commit.edit_message_hint"))
+                                .clicked()
+                            {
+                                acts.push(Action::EditCommit(c.hash.clone()));
+                            }
+                        }
                         if !c.parents.is_empty() {
                             ui.label(
                                 RichText::new(if c.parents.len() > 1 {

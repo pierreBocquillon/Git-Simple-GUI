@@ -1,6 +1,6 @@
 [package]
 name = "git-simple-gui"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 description = "Git Simple GUI - a clean, dark git client: commit graph, branches, remotes and everyday git actions."
 license = "PolyForm-Noncommercial-1.0.0"
